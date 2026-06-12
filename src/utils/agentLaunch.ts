@@ -684,6 +684,7 @@ export async function launchAgentInPane(opts: {
   slug: string;
   projectRoot: string;
   goalMode?: boolean;
+  effort?: EffortLevel;
   dmuxPaneId?: string;
   codexHookEventFile?: string;
   permissionMode?: '' | 'plan' | 'acceptEdits' | 'bypassPermissions';
@@ -696,6 +697,8 @@ export async function launchAgentInPane(opts: {
   if (agent === 'claude') {
     const permissionFlags = getPermissionFlags('claude', permissionMode);
     const permissionSuffix = permissionFlags ? ` ${permissionFlags}` : '';
+    const effortFlags = buildClaudeEffortFlags(opts.effort);
+    const effortSuffix = effortFlags ? ` ${effortFlags}` : '';
     let claudeCmd: string;
     if (hasInitialPrompt) {
       let promptFilePath: string | null = null;
@@ -707,17 +710,17 @@ export async function launchAgentInPane(opts: {
 
       if (promptFilePath) {
         const promptBootstrap = buildPromptReadAndDeleteSnippet(promptFilePath);
-        claudeCmd = `${promptBootstrap}; claude "$DMUX_PROMPT_CONTENT"${permissionSuffix}`;
+        claudeCmd = `${promptBootstrap}; claude "$DMUX_PROMPT_CONTENT"${permissionSuffix}${effortSuffix}`;
       } else {
         const escapedPrompt = launchPrompt
           .replace(/\\/g, '\\\\')
           .replace(/"/g, '\\"')
           .replace(/`/g, '\\`')
           .replace(/\$/g, '\\$');
-        claudeCmd = `claude "${escapedPrompt}"${permissionSuffix}`;
+        claudeCmd = `claude "${escapedPrompt}"${permissionSuffix}${effortSuffix}`;
       }
     } else {
-      claudeCmd = `claude${permissionSuffix}`;
+      claudeCmd = `claude${permissionSuffix}${effortSuffix}`;
     }
     await tmuxService.sendShellCommand(paneId, claudeCmd);
     await tmuxService.sendTmuxKeys(paneId, 'Enter');
@@ -796,17 +799,19 @@ export async function launchAgentInPane(opts: {
         launchCommand = `${promptBootstrap}; ${buildInitialPromptCommand(
           agent,
           '"$DMUX_PROMPT_CONTENT"',
-          permissionMode
+          permissionMode,
+          opts.effort
         )}`;
       } else {
         launchCommand = buildInitialPromptCommand(
           agent,
           shellQuote(launchPrompt),
-          permissionMode
+          permissionMode,
+          opts.effort
         );
       }
     } else {
-      launchCommand = buildAgentCommand(agent, permissionMode);
+      launchCommand = buildAgentCommand(agent, permissionMode, opts.effort);
     }
 
     await tmuxService.sendShellCommand(paneId, launchCommand);

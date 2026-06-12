@@ -9,7 +9,7 @@
 import * as fs from 'fs';
 import path from 'path';
 import type { DmuxPane, DmuxConfig } from '../types.js';
-import type { AgentName } from './agentLaunch.js';
+import type { AgentName, EffortLevel } from './agentLaunch.js';
 import { launchAgentInPane } from './agentLaunch.js';
 import { autoApproveTrustPrompt } from './paneCreation.js';
 import { TmuxService } from '../services/TmuxService.js';
@@ -28,6 +28,7 @@ export interface AttachAgentOptions {
   prompt: string;
   agent: AgentName;
   goalMode?: boolean;
+  effort?: EffortLevel;
   existingPanes: DmuxPane[];
   sessionProjectRoot: string;
   sessionConfigPath: string;
@@ -68,6 +69,7 @@ export async function attachAgentToWorktree(
     prompt,
     agent,
     goalMode: goalModeOverride,
+    effort,
     existingPanes,
     sessionProjectRoot,
     sessionConfigPath,
@@ -198,6 +200,7 @@ export async function attachAgentToWorktree(
     slug,
     projectRoot,
     goalMode,
+    effort,
     dmuxPaneId,
     codexHookEventFile,
     permissionMode: settings.permissionMode,

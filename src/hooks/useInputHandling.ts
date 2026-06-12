@@ -940,6 +940,7 @@ export function useInputHandling(params: UseInputHandlingParams) {
               prompt: promptInput.prompt,
               agent,
               goalMode: promptInput.goalMode,
+              effort: promptInput.effort,
               existingPanes: [...panes, ...createdPanes],
               sessionProjectRoot: projectRoot,
             sessionConfigPath: panesFile,
