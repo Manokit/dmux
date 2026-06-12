@@ -94,6 +94,13 @@ dmux can use default branch behavior or let you override branch details when cre
 
 Full documentation is available at **[dmux.ai](https://dmux.ai)**, including setup guides, configuration, and hooks.
 
+## Fork additions
+
+This fork adds an **effort selector** to the new-agent popup (set Claude's reasoning effort —
+`low … max`, or `ultracode` — before the terminal launches). See
+**[EFFORT_SELECTOR.md](./EFFORT_SELECTOR.md)** for usage, the code map, how to build/link, and
+how to keep this branch in sync with upstream.
+
 ## Contributing
 
 See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for the recommended local "dmux-on-dmux" development loop, hook setup, and PR workflow.
