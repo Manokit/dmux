@@ -23,6 +23,12 @@ import CleanTextInput from "../inputs/CleanTextInput.js"
 import InlineCursorInput from "../inputs/InlineCursorInput.js"
 import { scanProjectFiles, fuzzyMatchFiles } from "../../utils/fileScanner.js"
 import {
+  EFFORT_LEVELS,
+  getEffortLabel,
+  stepEffortLevel,
+  type EffortLevel,
+} from "../../utils/effort.js"
+import {
   BASE_BRANCH_ERROR_MESSAGE,
   clampSelectedIndex,
   filterBranches,
@@ -62,6 +68,9 @@ function debugLog(message: string, data?: any) {
 export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }) => {
   const [prompt, setPrompt] = useState("")
   const [goalMode, setGoalMode] = useState(DEFAULT_GOAL_MODE_ARG)
+  const [effort, setEffort] = useState<EffortLevel>('default')
+  // Within prompt mode, focus is on either the text input or the effort row.
+  const [promptSubFocus, setPromptSubFocus] = useState<'prompt' | 'effort'>('prompt')
   const [mode, setMode] = useState<'prompt' | 'gitOptions'>('prompt')
   const [baseBranch, setBaseBranch] = useState("")
   const [branchName, setBranchName] = useState("")
@@ -83,16 +92,25 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
   const [currentCursor, setCurrentCursor] = useState(0) // Track cursor position from CleanTextInput
 
   const getCurrentField = (): NewPaneField =>
-    mode === 'prompt' ? 'prompt' : activeGitField
+    mode === 'prompt' ? promptSubFocus : activeGitField
 
   const setCurrentField = (field: NewPaneField) => {
     if (field === 'prompt') {
       setMode('prompt')
+      setPromptSubFocus('prompt')
+      return
+    }
+
+    if (field === 'effort') {
+      setMode('prompt')
+      setPromptSubFocus('effort')
       return
     }
 
     setMode('gitOptions')
     setActiveGitField(field)
+    // Keep prompt sub-focus sane so returning from git options lands on the prompt.
+    setPromptSubFocus('prompt')
   }
 
   const writeSuccessResult = () => {
@@ -102,9 +120,10 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
       return
     }
 
-    const payload: { prompt: string; baseBranch?: string; branchName?: string; goalMode: boolean } = {
+    const payload: { prompt: string; baseBranch?: string; branchName?: string; goalMode: boolean; effort: EffortLevel } = {
       prompt,
       goalMode,
+      effort,
     }
 
     const trimmedBranchName = branchName.trim()
@@ -189,7 +208,7 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
 
   // Detect @ and scan files (cursor-aware)
   useEffect(() => {
-    if (mode !== 'prompt') {
+    if (mode !== 'prompt' || promptSubFocus === 'effort') {
       setIsFileListActive(false)
       setFilteredFiles([])
       setAtPosition(-1)
@@ -279,7 +298,7 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
       setFilteredFiles([])
       setAtPosition(-1)
     }
-  }, [prompt, currentCursor, mode])
+  }, [prompt, currentCursor, mode, promptSubFocus])
 
   // Handle keyboard navigation - runs BEFORE other handlers
   // This is critical: we need to intercept ESC for progressive behavior
@@ -394,13 +413,35 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
       return
     }
 
-    // With git options enabled, Tab/Shift+Tab also cycle into git fields
-    // from the prompt editor when file autocomplete is not active.
-    if (ENABLE_GIT_OPTIONS_ARG && !isFileListActive && (isForwardTab || isBackTab)) {
+    // Tab/Shift+Tab cycle between the prompt and the effort row (and, when git
+    // options are enabled, the git fields), as long as autocomplete isn't active.
+    if (!isFileListActive && (isForwardTab || isBackTab)) {
       const nextField = isForwardTab
-        ? getNextNewPaneField(getCurrentField())
-        : getPreviousNewPaneField(getCurrentField())
+        ? getNextNewPaneField(getCurrentField(), ENABLE_GIT_OPTIONS_ARG)
+        : getPreviousNewPaneField(getCurrentField(), ENABLE_GIT_OPTIONS_ARG)
       setCurrentField(nextField)
+      return
+    }
+
+    // Effort row focused: ←/→ adjust the level, Enter submits, Esc returns to the
+    // prompt. The text input is disabled while focused here, so swallow the rest.
+    if (promptSubFocus === 'effort') {
+      if (key.leftArrow) {
+        setEffort((current) => stepEffortLevel(current, -1))
+        return
+      }
+      if (key.rightArrow) {
+        setEffort((current) => stepEffortLevel(current, 1))
+        return
+      }
+      if (key.return) {
+        handleSubmit()
+        return
+      }
+      if (key.escape) {
+        setPromptSubFocus('prompt')
+        return
+      }
       return
     }
 
@@ -490,11 +531,16 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
       return
     }
 
-    writeSuccessAndExit(resultFile, { prompt: nextPrompt, goalMode }, exit)
+    writeSuccessAndExit(resultFile, { prompt: nextPrompt, goalMode, effort }, exit)
   }
 
   const shouldAllowCancel = () => {
     if (mode !== 'prompt') {
+      return false
+    }
+
+    // The effort row owns ESC (returns focus to the prompt), so don't cancel.
+    if (promptSubFocus === 'effort') {
       return false
     }
 
@@ -527,6 +573,11 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
     baseBranch.trim().length > 0 && !isValidBaseBranchOverride(baseBranch.trim(), availableBranches)
   const baseBranchBorderColor = isBaseBranchInvalidLive ? POPUP_CONFIG.errorColor : 'gray'
 
+  const effortFocused = mode === 'prompt' && promptSubFocus === 'effort'
+  const effortIndex = EFFORT_LEVELS.indexOf(effort)
+  const canDecreaseEffort = effortIndex > 0
+  const canIncreaseEffort = effortIndex < EFFORT_LEVELS.length - 1
+
   return (
     <PopupWrapper
       resultFile={resultFile}
@@ -535,7 +586,7 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
     >
       <PopupContainer
         footer={mode === 'prompt'
-          ? `${PopupFooters.input()} • Ctrl+G goal`
+          ? `${PopupFooters.input()} • Ctrl+G goal • Tab effort`
           : '↑↓ branch list • Tab/Shift+Tab cycle fields • Enter select/create • ESC progressive back'}
       >
         {mode === 'prompt' && (
@@ -578,6 +629,7 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
                 disableEscape={true}
                 onCursorChange={setCurrentCursor}
                 ignoreFocus={true}
+                disabled={effortFocused}
               />
             </Box>
 
@@ -585,6 +637,14 @@ export const NewPanePopupApp: React.FC<{ resultFile: string }> = ({ resultFile }
               <Text color={goalMode ? POPUP_CONFIG.titleColor : undefined}>
                 {goalMode ? '[x]' : '[ ]'} Goal mode
               </Text>
+            </Box>
+
+            {/* Effort selector — Tab to focus, ←/→ to change */}
+            <Box marginTop={0}>
+              <Text color={effortFocused ? POPUP_CONFIG.titleColor : undefined}>
+                {effortFocused ? '▶ ' : '  '}Effort: {canDecreaseEffort ? '◂ ' : '  '}{getEffortLabel(effort)}{canIncreaseEffort ? ' ▸' : ''}
+              </Text>
+              <Text dimColor>{effortFocused ? '   (←/→ to change)' : '   (Tab to change)'}</Text>
             </Box>
 
             {/* File list (shown when @ is detected) */}

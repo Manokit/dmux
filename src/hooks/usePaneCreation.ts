@@ -3,7 +3,7 @@ import * as os from 'os';
 import type { DmuxPane, NewPaneInput, MergeTargetReference } from '../types.js';
 import { createPane } from '../utils/paneCreation.js';
 import { LogService } from '../services/LogService.js';
-import { buildAgentLaunchInstances, type AgentName } from '../utils/agentLaunch.js';
+import { buildAgentLaunchInstances, type AgentName, type EffortLevel } from '../utils/agentLaunch.js';
 import { generateSlug } from '../utils/slug.js';
 
 interface Params {
@@ -25,6 +25,7 @@ interface CreateNewPaneOptions {
   baseBranchOverride?: string;
   branchNameOverride?: string;
   goalMode?: boolean;
+  effort?: EffortLevel;
   targetProjectRoot?: string;
   skipAgentSelection?: boolean;
   startPointBranch?: string;
@@ -106,6 +107,7 @@ export default function usePaneCreation({
         baseBranchOverride: options.baseBranchOverride,
         branchNameOverride: options.branchNameOverride,
         goalMode: options.goalMode,
+        effort: options.effort,
         projectRoot: options.targetProjectRoot,
         skipAgentSelection: options.skipAgentSelection,
         startPointBranch: options.startPointBranch,
@@ -135,6 +137,7 @@ export default function usePaneCreation({
       baseBranchOverride: options.baseBranchOverride ?? paneInput.baseBranch,
       branchNameOverride: options.branchNameOverride ?? paneInput.branchName,
       goalMode: options.goalMode ?? paneInput.goalMode,
+      effort: options.effort ?? paneInput.effort,
     };
 
     try {
@@ -202,6 +205,7 @@ export default function usePaneCreation({
         baseBranchOverride: paneInput.baseBranch,
         branchNameOverride: paneInput.branchName,
         goalMode: paneInput.goalMode,
+        effort: paneInput.effort,
         targetProjectRoot: options.targetProjectRoot,
         startPointBranch: options.startPointBranch,
         mergeTargetChain: options.mergeTargetChain,

@@ -18,6 +18,7 @@ import {
   getSendKeysReadyDelayMs,
   getSendKeysSubmit,
   buildGoalModePrompt,
+  buildClaudeEffortFlags,
   shouldEnableCodexGoals,
   supportsAgentGoalMode,
 } from '../src/utils/agentLaunch.js';
@@ -274,6 +275,57 @@ describe('command builders', () => {
   it('falls back to launch command when an agent has no resume template', () => {
     expect(buildAgentResumeOrLaunchCommand('opencode', 'bypassPermissions')).toBe(
       'opencode'
+    );
+  });
+});
+
+describe('claude effort', () => {
+  it('returns no flags for default/undefined effort', () => {
+    expect(buildClaudeEffortFlags(undefined)).toBe('');
+    expect(buildClaudeEffortFlags('default')).toBe('');
+  });
+
+  it('maps standard levels to the --effort flag', () => {
+    expect(buildClaudeEffortFlags('low')).toBe('--effort low');
+    expect(buildClaudeEffortFlags('medium')).toBe('--effort medium');
+    expect(buildClaudeEffortFlags('high')).toBe('--effort high');
+    expect(buildClaudeEffortFlags('xhigh')).toBe('--effort xhigh');
+    expect(buildClaudeEffortFlags('max')).toBe('--effort max');
+  });
+
+  it('maps ultracode to a per-session settings override (the CLI flag rejects ultracode)', () => {
+    expect(buildClaudeEffortFlags('ultracode')).toBe(`--settings '{"ultracode":true}'`);
+  });
+
+  it('injects effort into claude initial-prompt commands after permission flags', () => {
+    expect(buildInitialPromptCommand('claude', '"$P"', '', 'high')).toBe(
+      'claude --effort high "$P"'
+    );
+    expect(buildInitialPromptCommand('claude', '"$P"', 'plan', 'xhigh')).toBe(
+      'claude --permission-mode plan --effort xhigh "$P"'
+    );
+    expect(buildInitialPromptCommand('claude', '"$P"', '', 'ultracode')).toBe(
+      `claude --settings '{"ultracode":true}' "$P"`
+    );
+  });
+
+  it('injects effort into claude no-prompt commands', () => {
+    expect(buildAgentCommand('claude', '', 'max')).toBe('claude --effort max');
+    expect(buildAgentCommand('claude', 'acceptEdits', 'ultracode')).toBe(
+      `claude --permission-mode acceptEdits --settings '{"ultracode":true}'`
+    );
+  });
+
+  it('leaves the command unchanged for default effort', () => {
+    expect(buildInitialPromptCommand('claude', '"$P"', '', 'default')).toBe('claude "$P"');
+    expect(buildAgentCommand('claude', '', undefined)).toBe('claude');
+  });
+
+  it('ignores effort for non-claude agents', () => {
+    expect(buildInitialPromptCommand('codex', '"$P"', '', 'xhigh')).toBe('codex "$P"');
+    expect(buildAgentCommand('codex', '', 'ultracode')).toBe('codex');
+    expect(buildInitialPromptCommand('gemini', '"$P"', '', 'high')).toBe(
+      'gemini --prompt-interactive "$P"'
     );
   });
 });

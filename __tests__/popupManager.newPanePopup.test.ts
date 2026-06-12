@@ -179,6 +179,30 @@ describe('PopupManager launchNewPanePopup', () => {
     });
   });
 
+  it('preserves a valid effort level from the popup payload', async () => {
+    const manager = createPopupManager({ promptForGitOptionsOnCreate: false }) as any;
+    manager.checkPopupSupport = vi.fn(() => true);
+    manager.launchPopup = vi.fn().mockResolvedValue({
+      success: true,
+      data: { prompt: 'prompt', goalMode: false, effort: 'ultracode' },
+    });
+
+    const result = await manager.launchNewPanePopup('/tmp/project');
+
+    expect(result).toEqual({ prompt: 'prompt', goalMode: false, effort: 'ultracode' });
+  });
+
+  it('drops default and unknown effort values', async () => {
+    const manager = createPopupManager({ promptForGitOptionsOnCreate: false }) as any;
+    manager.checkPopupSupport = vi.fn(() => true);
+    manager.launchPopup = vi.fn()
+      .mockResolvedValueOnce({ success: true, data: { prompt: 'a', effort: 'default' } })
+      .mockResolvedValueOnce({ success: true, data: { prompt: 'b', effort: 'bogus' } });
+
+    expect(await manager.launchNewPanePopup('/tmp/project')).toEqual({ prompt: 'a' });
+    expect(await manager.launchNewPanePopup('/tmp/project')).toEqual({ prompt: 'b' });
+  });
+
   it('returns null for malformed popup payloads', async () => {
     const manager = createPopupManager({ promptForGitOptionsOnCreate: true }) as any;
     manager.checkPopupSupport = vi.fn(() => true);

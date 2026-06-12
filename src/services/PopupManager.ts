@@ -27,6 +27,7 @@ import { INPUT_IGNORE_DELAY } from "../constants/timing.js"
 import {
   getAgentDefinitions,
   isAgentName,
+  isEffortLevel,
   resolveEnabledAgentsSelection,
   type AgentName,
 } from "../utils/agentLaunch.js"
@@ -353,6 +354,10 @@ export class PopupManager {
     }
     if (typeof candidate.goalMode === "boolean") {
       normalized.goalMode = candidate.goalMode
+    }
+    // 'default' means "no effort flag" — equivalent to omitting it.
+    if (isEffortLevel(candidate.effort) && candidate.effort !== "default") {
+      normalized.effort = candidate.effort
     }
 
     return normalized

@@ -573,7 +573,8 @@ async function buildLaunchCommand(config: PaneBootstrapConfig): Promise<string |
       launchCommand = `${promptBootstrap}; ${buildInitialPromptCommand(
         config.agent,
         '"$DMUX_PROMPT_CONTENT"',
-        config.permissionMode
+        config.permissionMode,
+        config.effort
       )}`;
     } else {
       const escapedPrompt = launchPrompt
@@ -584,11 +585,12 @@ async function buildLaunchCommand(config: PaneBootstrapConfig): Promise<string |
       launchCommand = buildInitialPromptCommand(
         config.agent,
         `"${escapedPrompt}"`,
-        config.permissionMode
+        config.permissionMode,
+        config.effort
       );
     }
   } else {
-    launchCommand = buildAgentCommand(config.agent, config.permissionMode);
+    launchCommand = buildAgentCommand(config.agent, config.permissionMode, config.effort);
   }
 
   if (config.agent === 'claude') {

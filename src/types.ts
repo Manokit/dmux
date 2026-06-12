@@ -1,4 +1,4 @@
-import type { AgentName, PermissionMode } from './utils/agentLaunch.js';
+import type { AgentName, EffortLevel, PermissionMode } from './utils/agentLaunch.js';
 import type { NotificationSoundId } from './utils/notificationSounds.js';
 
 export type DmuxThemeName =
@@ -149,6 +149,7 @@ export interface NewPaneInput {
   baseBranch?: string;
   branchName?: string;
   goalMode?: boolean;
+  effort?: EffortLevel;
 }
 
 export type SettingsScope = 'global' | 'project';

@@ -17,7 +17,7 @@ import { triggerHook } from './hooks.js';
 import { TMUX_SPLIT_DELAY } from '../constants/timing.js';
 import { atomicWriteJsonSync } from './atomicWrite.js';
 import { LogService } from '../services/LogService.js';
-import type { AgentName } from './agentLaunch.js';
+import type { AgentName, EffortLevel } from './agentLaunch.js';
 import { getPaneTmuxTitle } from './paneTitle.js';
 import { shellQuote } from './promptStore.js';
 import { isValidBranchName, isValidFullBranchName } from './git.js';
@@ -39,6 +39,9 @@ export interface CreatePaneOptions {
   baseBranchOverride?: string;
   branchNameOverride?: string;
   goalMode?: boolean;
+  // Reasoning effort for the launched agent (Claude only). Per-pane launch-time
+  // choice; not persisted and not reapplied on resume/reopen.
+  effort?: EffortLevel;
   existingWorktree?: {
     slug: string;
     worktreePath: string;
@@ -165,6 +168,7 @@ export async function createPane(
     baseBranchOverride,
     branchNameOverride,
     goalMode: goalModeOverride,
+    effort,
     existingWorktree,
     startPointBranch,
     mergeTargetChain,
@@ -495,6 +499,7 @@ export async function createPane(
     agent,
     permissionMode: settings.permissionMode,
     goalMode,
+    effort,
     pane: newPane,
     tmuxTitle,
     existingWorktree: !!existingWorktree,

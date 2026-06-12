@@ -10,6 +10,13 @@ import {
   CODEX_ENABLE_GOALS_FLAG,
 } from './codexHooks.js';
 import { sendPromptViaTmux } from './agentPromptDispatch.js';
+import { type EffortLevel } from './effort.js';
+
+// Re-exported so existing importers (types, paneCreation, PopupManager, …) keep
+// sourcing effort helpers from agentLaunch. The definitions live in ./effort to
+// stay dependency-free for the standalone popup process.
+export { EFFORT_LEVELS, isEffortLevel, getEffortLabel, stepEffortLevel } from './effort.js';
+export type { EffortLevel } from './effort.js';
 
 export const AGENT_IDS = [
   'claude',
@@ -29,6 +36,16 @@ export const AGENT_IDS = [
 export type AgentName = typeof AGENT_IDS[number];
 export type PermissionMode = '' | 'plan' | 'acceptEdits' | 'bypassPermissions';
 export type PromptTransport = 'positional' | 'option' | 'stdin' | 'send-keys';
+
+// Levels accepted directly by `claude --effort`. `ultracode` is NOT accepted by
+// the flag (the CLI warns and ignores it), so it is applied via --settings instead.
+const CLAUDE_EFFORT_FLAG_LEVELS: ReadonlySet<EffortLevel> = new Set([
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+]);
 
 export interface AgentLaunchOption {
   id: string;
@@ -490,6 +507,30 @@ function appendFlags(base: string, flags: string): string {
   return flags ? `${base} ${flags}` : base;
 }
 
+/**
+ * Build the Claude CLI flags that set reasoning effort for a session.
+ *
+ * - low/medium/high/xhigh/max -> `--effort <level>` (native flag)
+ * - ultracode -> `--settings '{"ultracode":true}'` because the `--effort` flag
+ *   rejects `ultracode`; the setting enables xhigh effort plus standing
+ *   dynamic-workflow orchestration, scoped to this session only.
+ * - default/undefined -> '' (no change)
+ */
+export function buildClaudeEffortFlags(effort?: EffortLevel): string {
+  if (!effort || effort === 'default') return '';
+  if (effort === 'ultracode') return `--settings '{"ultracode":true}'`;
+  if (CLAUDE_EFFORT_FLAG_LEVELS.has(effort)) return `--effort ${effort}`;
+  return '';
+}
+
+/**
+ * Effort flags for a given agent. Only Claude consumes effort today; every other
+ * agent ignores it so the launch command is unchanged.
+ */
+function getAgentEffortFlags(agent: AgentName, effort?: EffortLevel): string {
+  return agent === 'claude' ? buildClaudeEffortFlags(effort) : '';
+}
+
 export function appendSlugSuffix(baseSlug: string, slugSuffix?: string): string {
   if (!slugSuffix) return baseSlug;
 
@@ -569,26 +610,29 @@ export function getPermissionFlags(
 
 export function buildAgentCommand(
   agent: AgentName,
-  permissionMode: PermissionMode | undefined
+  permissionMode: PermissionMode | undefined,
+  effort?: EffortLevel
 ): string {
   const definition = AGENT_REGISTRY[agent];
   const baseCommand = definition.noPromptCommand || definition.promptCommand;
-  return appendFlags(baseCommand, getPermissionFlags(agent, permissionMode));
+  const withPermissions = appendFlags(baseCommand, getPermissionFlags(agent, permissionMode));
+  return appendFlags(withPermissions, getAgentEffortFlags(agent, effort));
 }
 
 export function buildInitialPromptCommand(
   agent: AgentName,
   promptToken: string,
-  permissionMode: PermissionMode | undefined
+  permissionMode: PermissionMode | undefined,
+  effort?: EffortLevel
 ): string {
   const definition = AGENT_REGISTRY[agent];
   if (definition.promptTransport === 'send-keys') {
-    return buildAgentCommand(agent, permissionMode);
+    return buildAgentCommand(agent, permissionMode, effort);
   }
 
   const baseCommand = appendFlags(
-    definition.promptCommand,
-    getPermissionFlags(agent, permissionMode)
+    appendFlags(definition.promptCommand, getPermissionFlags(agent, permissionMode)),
+    getAgentEffortFlags(agent, effort)
   );
 
   if (definition.promptTransport === 'stdin') {

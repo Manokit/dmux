@@ -1,5 +1,5 @@
 import type { DmuxPane } from '../types.js';
-import type { AgentName, PermissionMode } from './agentLaunch.js';
+import type { AgentName, EffortLevel, PermissionMode } from './agentLaunch.js';
 
 export const DMUX_BOOTSTRAP_PANE_TITLE_PREFIX = 'dmux-bootstrap:';
 
@@ -13,6 +13,8 @@ export interface PaneBootstrapConfig {
   agent?: AgentName;
   permissionMode?: PermissionMode;
   goalMode?: boolean;
+  // Reasoning effort for the launched agent (Claude only); undefined = CLI default.
+  effort?: EffortLevel;
   pane: DmuxPane;
   tmuxTitle: string;
   existingWorktree: boolean;
